@@ -1,9 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-
-function getWorkerUrl() {
-  return localStorage.getItem('silicon-worker-url') || (import.meta as any).env?.VITE_WORKER_URL || '';
-}
+import { getWorkerUrl } from '../App';
 
 interface Phase {
   phase: string;
@@ -24,7 +21,6 @@ interface Phase {
   summary?: string;
   success?: boolean;
   next_steps?: string[];
-  rationale?: string;
 }
 
 interface LogEntry {
@@ -35,7 +31,7 @@ interface LogEntry {
 
 const DEFAULT_PLOT = [
   { x: 2.1, energy: -10.2 }, { x: 2.3, energy: -12.5 }, { x: 2.5, energy: -11.8 },
-  { x: 2.8, energy: -9.4 }, { x: 3.1, energy: -8.1 }, { x: 3.5, energy: -7.5 }, { x: 4.0, energy: -7.0 },
+  { x: 2.8, energy: -9.4 },  { x: 3.1, energy: -8.1 },  { x: 3.5, energy: -7.5 }, { x: 4.0, energy: -7.0 },
 ];
 
 const LOOP_STEPS = ['Write Script', 'Execute', 'Analyze', 'Self-Correct'];
@@ -48,7 +44,7 @@ function syntaxHighlight(line: string): React.ReactNode {
   let m: RegExpExecArray | null;
   while ((m = regex.exec(line)) !== null) {
     if (m.index > last) parts.push(<span key={last}>{line.slice(last, m.index)}</span>);
-    if (m[1]) parts.push(<span key={m.index} className="kw">{m[1]}</span>);
+    if (m[1])      parts.push(<span key={m.index} className="kw">{m[1]}</span>);
     else if (m[2]) parts.push(<span key={m.index} className="str">{m[2]}</span>);
     else if (m[3]) parts.push(<span key={m.index} className="num">{m[3]}</span>);
     else if (m[4]) parts.push(<span key={m.index} className="fn">{m[4]}</span>);
@@ -61,54 +57,78 @@ function syntaxHighlight(line: string): React.ReactNode {
 function getLogClass(level: string) {
   switch (level) {
     case 'ERROR': return 'log-error';
-    case 'WARN': return 'log-warn';
-    case 'EXEC': return 'log-exec';
-    case 'DATA': return 'log-data';
-    default: return 'log-info';
+    case 'WARN':  return 'log-warn';
+    case 'EXEC':  return 'log-exec';
+    case 'DATA':  return 'log-data';
+    default:      return 'log-info';
   }
 }
 
-export function WorkspaceView() {
-  const [isSimulating, setIsSimulating] = useState(false);
-  const [loopStep, setLoopStep] = useState(0);
-  const [iteration, setIteration] = useState(0);
-  const [maxIterations, setMaxIterations] = useState(5);
-  const [hypothesis, setHypothesis] = useState('');
-  const [logs, setLogs] = useState<LogEntry[]>([
-    { time: '00:00:00', level: 'INFO', msg: 'Silicon Scientist kernel ready. Click "New Experiment" to begin.' }
+interface WorkspaceViewProps {
+  showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
+}
+
+export function WorkspaceView({ showToast }: WorkspaceViewProps) {
+  const [isSimulating, setIsSimulating]     = useState(false);
+  const [loopStep, setLoopStep]             = useState(0);
+  const [iteration, setIteration]           = useState(0);
+  const [maxIterations, setMaxIterations]   = useState(5);
+  const [hypothesis, setHypothesis]         = useState('');
+  const [logs, setLogs]                     = useState<LogEntry[]>([
+    { time: '00:00:00', level: 'INFO', msg: 'Silicon Scientist kernel ready. Click "New Experiment" to begin.' },
   ]);
-  const [activeTab, setActiveTab] = useState<'code' | 'console' | 'plot'>('code');
-  const [currentScript, setCurrentScript] = useState('');
-  const [currentStdout, setCurrentStdout] = useState('');
-  const [plotData, setPlotData] = useState(DEFAULT_PLOT);
-  const [phases, setPhases] = useState<Phase[]>([]);
-  const [conclusion, setConclusion] = useState<Phase | null>(null);
-  const [metrics, setMetrics] = useState({ success_rate: 0, confidence: 0, key_finding: '' });
+  const [activeTab, setActiveTab]           = useState<'code' | 'console' | 'plot'>('code');
+  const [currentScript, setCurrentScript]   = useState('');
+  const [currentStdout, setCurrentStdout]   = useState('');
+  const [plotData, setPlotData]             = useState(DEFAULT_PLOT);
+  const [phases, setPhases]                 = useState<Phase[]>([]);
+  const [conclusion, setConclusion]         = useState<Phase | null>(null);
+  const [metrics, setMetrics]               = useState({ success_rate: 0, confidence: 0, key_finding: '' });
   const [experimentProblem, setExperimentProblem] = useState('');
-  const [toolCalls, setToolCalls] = useState<{ name: string; desc: string; status: string }[]>([]);
+  const [toolCalls, setToolCalls]           = useState<{ name: string; desc: string; status: string }[]>([]);
+  const [workerConfigured, setWorkerConfigured] = useState(false);
 
   const logsEndRef = useRef<HTMLDivElement>(null);
+  const abortRef   = useRef<AbortController | null>(null);
 
-  const now = () => new Date().toLocaleTimeString('en-US', { hour12: false });
+  const nowStr = () => new Date().toLocaleTimeString('en-US', { hour12: false });
 
   const addLog = useCallback((level: string, msg: string) => {
-    setLogs(prev => [...prev.slice(-200), { time: now(), level, msg }]);
+    setLogs(prev => [...prev.slice(-300), { time: nowStr(), level, msg }]);
   }, []);
 
-  useEffect(() => { logsEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [logs]);
+  // Check worker config on mount and on settings change
+  const checkWorkerConfig = useCallback(() => {
+    setWorkerConfigured(!!getWorkerUrl());
+  }, []);
+
+  useEffect(() => {
+    checkWorkerConfig();
+    window.addEventListener('silicon:settings-changed', checkWorkerConfig);
+    return () => window.removeEventListener('silicon:settings-changed', checkWorkerConfig);
+  }, [checkWorkerConfig]);
+
+  useEffect(() => {
+    logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [logs]);
 
   useEffect(() => {
     const handler = (e: CustomEvent) => startExperiment(e.detail);
     window.addEventListener('silicon:start-experiment', handler as EventListener);
     return () => window.removeEventListener('silicon:start-experiment', handler as EventListener);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const startExperiment = useCallback((data: any) => {
     const WORKER_URL = getWorkerUrl();
     if (!WORKER_URL) {
-      addLog('ERROR', 'No Worker URL configured. Go to Settings to set your Cloudflare Worker URL.');
+      showToast('Worker URL not configured. Go to Settings first.', 'error');
+      addLog('ERROR', 'No Worker URL configured. Go to Settings → Worker Endpoint URL.');
       return;
     }
+
+    // Cancel any previous request
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
 
     setExperimentProblem(data.problem || '');
     setIsSimulating(true);
@@ -119,50 +139,59 @@ export function WorkspaceView() {
     setConclusion(null);
     setCurrentScript('');
     setCurrentStdout('');
-    setHypothesis('Initializing autonomous research loop...');
+    setHypothesis('Initializing autonomous research loop…');
     setToolCalls([]);
     setMetrics({ success_rate: 0, confidence: 0, key_finding: '' });
-    setLogs([{ time: now(), level: 'INFO', msg: `Experiment started. Problem: ${(data.problem || '').slice(0, 80)}...` }]);
+    setLogs([{ time: nowStr(), level: 'INFO', msg: `Experiment started: ${(data.problem || '').slice(0, 80)}…` }]);
+    setActiveTab('console');
 
     fetch(`${WORKER_URL}/api/experiment/start`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
+      signal: abortRef.current.signal,
     })
       .then(async res => {
         if (!res.ok || !res.body) {
-          addLog('ERROR', `Worker returned ${res.status}. Check your Worker URL in Settings.`);
+          const text = await res.text().catch(() => '');
+          addLog('ERROR', `Worker returned ${res.status}: ${text.slice(0, 120)}`);
+          showToast(`Worker error: ${res.status}`, 'error');
           setIsSimulating(false);
           setLoopStep(0);
           window.dispatchEvent(new CustomEvent('silicon:simulation-ended'));
           return;
         }
 
-        const reader = res.body.getReader();
+        addLog('INFO', 'SSE stream opened. Awaiting K2 response…');
+
+        const reader  = res.body.getReader();
         const decoder = new TextDecoder();
-        let buffer = '';
+        let buffer    = '';
 
         const dispatch = (event: string, payload: any) => {
           switch (event) {
             case 'start':
-              addLog('INFO', `K2 connected. Running autonomous loop...`);
+              addLog('INFO', 'K2 connected. Running autonomous research loop…');
               break;
             case 'phase':
               handlePhase(payload as Phase);
               break;
             case 'thinking':
-              addLog('INFO', payload.content?.slice(0, 120) || '');
+              if (payload.content) addLog('INFO', `[thinking] ${payload.content.slice(0, 120)}`);
               break;
             case 'complete':
               setIsSimulating(false);
               setLoopStep(0);
               addLog('INFO', payload.status === 'finished'
                 ? `✓ Research loop complete after ${payload.iterations} iterations.`
-                : 'Loop ended: max phases reached.');
+                : `Loop ended: ${payload.status || 'max iterations reached'}.`
+              );
+              showToast('Research loop complete', 'success');
               window.dispatchEvent(new CustomEvent('silicon:simulation-ended'));
               break;
             case 'error':
               addLog('ERROR', payload.message || 'Unknown error from K2 API');
+              showToast(payload.message || 'K2 API error', 'error');
               setIsSimulating(false);
               setLoopStep(0);
               window.dispatchEvent(new CustomEvent('silicon:simulation-ended'));
@@ -177,39 +206,40 @@ export function WorkspaceView() {
               setLoopStep(1);
               setIteration(phase.iteration || 1);
               if (phase.hypothesis) setHypothesis(phase.hypothesis);
-              if (phase.script) setCurrentScript(phase.script);
-              setActiveTab('code');
-              addLog('EXEC', `[Iter ${phase.iteration}] Writing simulation script...`);
+              if (phase.script)     { setCurrentScript(phase.script); setActiveTab('code'); }
+              addLog('EXEC', `[Iter ${phase.iteration}] Writing simulation script…`);
               break;
             case 'EXECUTE_SCRIPT':
               setLoopStep(2);
-              if (phase.stdout) setCurrentStdout(phase.stdout);
-              setActiveTab('console');
-              addLog('INFO', `[Iter ${phase.iteration}] Executing simulation...`);
+              if (phase.stdout) { setCurrentStdout(phase.stdout); setActiveTab('console'); }
+              addLog('INFO', `[Iter ${phase.iteration}] Executing simulation…`);
               if (phase.metrics) {
-                setMetrics({ success_rate: phase.metrics.success_rate, confidence: phase.metrics.confidence, key_finding: phase.metrics.key_finding });
-                addLog('DATA', `Finding: ${phase.metrics.key_finding}`);
-                const b = -10 - phase.metrics.confidence * 5;
+                const m = phase.metrics;
+                setMetrics({ success_rate: m.success_rate, confidence: m.confidence, key_finding: m.key_finding });
+                addLog('DATA', `Finding: ${m.key_finding}`);
+                const b = -10 - m.confidence * 5;
                 setPlotData(Array.from({ length: 7 }, (_, i) => ({
                   x: +(2.0 + i * 0.3).toFixed(1),
-                  energy: +(b - (i < 3 ? i * phase.metrics!.confidence * 2 : (6 - i) * phase.metrics!.confidence)).toFixed(2),
+                  energy: +(b - (i < 3 ? i * m.confidence * 2 : (6 - i) * m.confidence)).toFixed(2),
                 })));
               }
               break;
             case 'ANALYZE_RESULTS':
               setLoopStep(3);
               setActiveTab('plot');
-              addLog('INFO', `[Iter ${phase.iteration}] Analyzing results — ${phase.passed ? 'PASS' : 'FAIL'}`);
+              addLog('INFO', `[Iter ${phase.iteration}] Analysis — ${phase.passed ? 'PASS ✓' : 'FAIL ✕'}`);
               if (phase.tool_calls) {
                 setToolCalls(prev => [...prev, ...phase.tool_calls!]);
-                phase.tool_calls.forEach(tc => addLog(tc.status === 'OK' ? 'EXEC' : 'ERROR', `${tc.name}: ${tc.desc}`));
+                phase.tool_calls.forEach(tc =>
+                  addLog(tc.status === 'OK' ? 'EXEC' : 'ERROR', `${tc.name}: ${tc.desc}`)
+                );
               }
               break;
             case 'CORRECT_HYPOTHESIS':
               setLoopStep(4);
               if (phase.new_hypothesis) setHypothesis(phase.new_hypothesis);
               addLog('WARN', `[Iter ${phase.iteration}] Failure: ${(phase.failure_reason || '').slice(0, 100)}`);
-              addLog('INFO', `Self-correcting: ${(phase.correction || '').slice(0, 100)}`);
+              addLog('INFO',  `Self-correcting: ${(phase.correction || '').slice(0, 100)}`);
               break;
             case 'CONCLUSION':
               setLoopStep(0);
@@ -222,38 +252,49 @@ export function WorkspaceView() {
           }
         };
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
-          let eventName = '', dataLine = '';
-          for (const line of lines) {
-            if (line.startsWith('event: ')) eventName = line.slice(7).trim();
-            else if (line.startsWith('data: ')) dataLine = line.slice(6).trim();
-            else if (line === '' && eventName && dataLine) {
-              try { dispatch(eventName, JSON.parse(dataLine)); } catch {}
-              eventName = ''; dataLine = '';
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+            let eventName = '', dataLine = '';
+            for (const line of lines) {
+              if (line.startsWith('event: '))      eventName = line.slice(7).trim();
+              else if (line.startsWith('data: '))  dataLine  = line.slice(6).trim();
+              else if (line === '' && eventName && dataLine) {
+                try { dispatch(eventName, JSON.parse(dataLine)); } catch { /* ignore malformed */ }
+                eventName = ''; dataLine = '';
+              }
             }
           }
+        } catch (streamErr: any) {
+          if (streamErr.name !== 'AbortError') {
+            addLog('ERROR', `Stream error: ${streamErr.message}`);
+          }
         }
+
         setIsSimulating(false);
         setLoopStep(0);
         window.dispatchEvent(new CustomEvent('silicon:simulation-ended'));
       })
-      .catch(err => {
-        addLog('ERROR', `Connection failed: ${err.message}. Check your Worker URL in Settings.`);
+      .catch((err: any) => {
+        if (err.name === 'AbortError') return;
+        addLog('ERROR', `Connection failed: ${err.message}`);
+        showToast(`Connection failed: ${err.message}`, 'error');
         setIsSimulating(false);
         setLoopStep(0);
         window.dispatchEvent(new CustomEvent('silicon:simulation-ended'));
       });
-  }, [addLog]);
+  }, [addLog, showToast]);
 
   const stopSimulation = () => {
+    abortRef.current?.abort();
     setIsSimulating(false);
     setLoopStep(0);
     addLog('WARN', 'Research loop halted by user.');
+    showToast('Simulation stopped', 'info');
     window.dispatchEvent(new CustomEvent('silicon:simulation-ended'));
   };
 
@@ -262,8 +303,8 @@ export function WorkspaceView() {
   const progressPct = maxIterations > 0 ? Math.round((iteration / maxIterations) * 100) : 0;
 
   return (
-    <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '320px 1fr', gap: 0, overflow: 'hidden', height: '100%' }}>
-      {/* Left: Agent Reasoning Panel */}
+    <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '320px 1fr', overflow: 'hidden', height: '100%' }}>
+      {/* ── Left: Agent Reasoning Panel ── */}
       <div style={{ borderRight: '1px solid var(--rule)', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--white)' }}>
         {/* Header */}
         <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--rule)', flexShrink: 0 }}>
@@ -272,7 +313,9 @@ export function WorkspaceView() {
               Agent Reasoning
             </h3>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {isSimulating && <span className="pulse" style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--accent-sage)', display: 'inline-block' }} />}
+              {isSimulating && (
+                <span className="pulse" style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--accent-sage)', display: 'inline-block' }} />
+              )}
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-muted)' }}>
                 {iteration > 0 ? `Iter ${iteration}/${maxIterations}` : 'Idle'}
               </span>
@@ -293,6 +336,28 @@ export function WorkspaceView() {
         </div>
 
         <div className="scroll-area" style={{ flex: 1, overflowY: 'auto', padding: '16px 18px' }}>
+          {/* No-worker warning */}
+          {!workerConfigured && !isSimulating && (
+            <div style={{
+              marginBottom: 16, padding: '12px 14px',
+              background: 'var(--accent-light)',
+              border: '1px solid var(--accent-mid)',
+              borderRadius: 'var(--radius-md)',
+            }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', marginBottom: 4 }}>⚠ Worker Not Configured</div>
+              <p style={{ fontSize: 12, color: 'var(--ink-mid)', margin: '0 0 8px', lineHeight: 1.5 }}>
+                Go to <strong>Settings</strong> and enter your Cloudflare Worker URL to run experiments.
+              </p>
+              <button
+                className="btn-ghost"
+                style={{ fontSize: 11, padding: '4px 10px' }}
+                onClick={() => window.dispatchEvent(new CustomEvent('silicon:nav', { detail: 'settings' }))}
+              >
+                Open Settings →
+              </button>
+            </div>
+          )}
+
           {/* Problem */}
           {experimentProblem && (
             <div style={{ marginBottom: 16, padding: '10px 12px', background: 'var(--paper)', borderRadius: 'var(--radius-md)', border: '1px solid var(--rule-light)' }}>
@@ -348,7 +413,7 @@ export function WorkspaceView() {
             <div style={{ marginBottom: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               {[
                 { label: 'Success Rate', value: `${metrics.success_rate.toFixed(1)}%`, color: 'var(--accent-sage)' },
-                { label: 'Confidence', value: metrics.confidence.toFixed(2), color: 'var(--accent)' },
+                { label: 'Confidence',   value: metrics.confidence.toFixed(2),         color: 'var(--accent)' },
               ].map((m, i) => (
                 <div key={i} style={{ padding: '10px 12px', background: 'var(--paper)', borderRadius: 'var(--radius-md)', border: '1px solid var(--rule-light)' }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>{m.label}</div>
@@ -363,7 +428,7 @@ export function WorkspaceView() {
             </div>
           )}
 
-          {/* Loop steps */}
+          {/* Loop Steps */}
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
               Autonomous Loop
@@ -371,7 +436,7 @@ export function WorkspaceView() {
             {LOOP_STEPS.map((step, i) => {
               const stepNum = i + 1;
               const isActive = loopStep === stepNum;
-              const isDone = isSimulating ? loopStep > stepNum : (conclusion && !isSimulating);
+              const isDone   = isSimulating ? loopStep > stepNum : (!!conclusion && !isSimulating);
               return (
                 <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: i < LOOP_STEPS.length - 1 ? 12 : 0 }}>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
@@ -397,10 +462,10 @@ export function WorkspaceView() {
                     </div>
                     {isActive && isSimulating && (
                       <div style={{ fontSize: 11, color: 'var(--ink-muted)', fontStyle: 'italic' }}>
-                        {stepNum === 1 && 'Writing Python simulation script...'}
-                        {stepNum === 2 && 'Running simulation, collecting outputs...'}
-                        {stepNum === 3 && 'Analyzing results, calling lab tools...'}
-                        {stepNum === 4 && 'Revising hypothesis for next iteration...'}
+                        {stepNum === 1 && 'Writing Python simulation script…'}
+                        {stepNum === 2 && 'Running simulation, collecting outputs…'}
+                        {stepNum === 3 && 'Analyzing results, calling lab tools…'}
+                        {stepNum === 4 && 'Revising hypothesis for next iteration…'}
                       </div>
                     )}
                   </div>
@@ -409,7 +474,7 @@ export function WorkspaceView() {
             })}
           </div>
 
-          {/* Phase history */}
+          {/* Phase History */}
           {phases.length > 0 && (
             <div>
               <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
@@ -417,10 +482,10 @@ export function WorkspaceView() {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {phases.slice(-8).map((p, i) => {
-                  const color = p.phase === 'CONCLUSION' ? (p.success ? 'var(--accent-sage)' : 'var(--accent-gold)') :
-                    p.phase === 'CORRECT_HYPOTHESIS' ? 'var(--accent)' :
-                    p.phase === 'WRITE_SCRIPT' ? 'var(--accent-slate)' :
-                    'var(--ink-muted)';
+                  const color = p.phase === 'CONCLUSION'         ? (p.success ? 'var(--accent-sage)' : 'var(--accent-gold)')
+                    : p.phase === 'CORRECT_HYPOTHESIS' ? 'var(--accent)'
+                    : p.phase === 'WRITE_SCRIPT'       ? 'var(--accent-slate)'
+                    : 'var(--ink-muted)';
                   return (
                     <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                       <span style={{ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0 }} />
@@ -449,16 +514,16 @@ export function WorkspaceView() {
         </div>
       </div>
 
-      {/* Right: Terminal + Code */}
+      {/* ── Right: Terminal + Code ── */}
       <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--off-white)' }}>
         {/* Loop status bar */}
         <div style={{ padding: '12px 20px', background: 'var(--white)', borderBottom: '1px solid var(--rule)', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
             {LOOP_STEPS.map((step, i) => (
               <React.Fragment key={i}>
-                <div className={`loop-step ${loopStep === i + 1 ? 'active' : (loopStep > i + 1 || (conclusion && !isSimulating)) ? 'done' : ''}`}>
+                <div className={`loop-step ${loopStep === i + 1 ? 'active' : (loopStep > i + 1 || (!!conclusion && !isSimulating)) ? 'done' : ''}`}>
                   <div className="loop-step-num">
-                    {(loopStep > i + 1 || (conclusion && !isSimulating)) ? '✓' : (i + 1).toString().padStart(2, '0')}
+                    {(loopStep > i + 1 || (!!conclusion && !isSimulating)) ? '✓' : (i + 1).toString().padStart(2, '0')}
                   </div>
                   <div className="loop-step-label">{step}</div>
                 </div>
@@ -488,7 +553,9 @@ export function WorkspaceView() {
                   style={{
                     padding: '3px 10px', borderRadius: 4, border: 'none',
                     background: activeTab === tab ? '#1e1d1b' : 'transparent',
-                    color: activeTab === tab ? (tab === 'code' ? '#d4512a' : tab === 'console' ? '#3a6b5a' : '#2d4a6e') : '#4a4540',
+                    color: activeTab === tab
+                      ? (tab === 'code' ? '#d4512a' : tab === 'console' ? '#3a6b5a' : '#2d4a6e')
+                      : '#4a4540',
                     fontSize: 11.5, fontFamily: 'var(--font-mono)', cursor: 'pointer', fontWeight: 500,
                   }}
                 >
@@ -498,38 +565,40 @@ export function WorkspaceView() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: '#4a4540' }}>K2-Think-v2</span>
-              {isSimulating && <span style={{ fontSize: 10.5, fontFamily: 'var(--font-mono)', color: '#3a6b5a' }} className="pulse">● LIVE</span>}
+              {isSimulating && (
+                <span style={{ fontSize: 10.5, fontFamily: 'var(--font-mono)', color: '#3a6b5a' }} className="pulse">● LIVE</span>
+              )}
             </div>
           </div>
 
           {/* Tab content */}
           <div className="scroll-area" style={{ flex: 1, overflow: 'auto' }}>
+            {/* Code Tab */}
             {activeTab === 'code' && (
               <div style={{ padding: '16px 0' }}>
-                {currentScript ? (
-                  currentScript.split('\n').map((line, i) => (
-                    <div key={i} style={{ display: 'flex', gap: 0, padding: '0 16px', minHeight: '1.7em' }}>
-                      <span className="ln-num" style={{ minWidth: '2.5rem', paddingRight: 16, fontFamily: 'var(--font-mono)', fontSize: 12 }}>{i + 1}</span>
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
-                        {syntaxHighlight(line)}
-                      </span>
-                    </div>
-                  ))
-                ) : (
-                  <>
-                    {['# Silicon Scientist — Awaiting experiment initialization', '# Start a new experiment to see K2-generated simulation scripts.', '', 'import numpy as np', 'import scipy.optimize as opt', 'from scipy.stats import norm', '# ...'].map((line, i) => (
-                      <div key={i} style={{ display: 'flex', gap: 0, padding: '0 16px', minHeight: '1.7em' }}>
-                        <span className="ln-num" style={{ minWidth: '2.5rem', paddingRight: 16, fontFamily: 'var(--font-mono)', fontSize: 12 }}>{i + 1}</span>
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, whiteSpace: 'pre-wrap' }}>
-                          {syntaxHighlight(line)}
-                        </span>
-                      </div>
-                    ))}
-                  </>
-                )}
+                {(currentScript
+                  ? currentScript.split('\n')
+                  : [
+                    '# Silicon Scientist — Awaiting experiment initialization',
+                    '# Start a new experiment to see K2-generated simulation scripts.',
+                    '',
+                    'import numpy as np',
+                    'import scipy.optimize as opt',
+                    'from scipy.stats import norm',
+                    '# ...',
+                  ]
+                ).map((line, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 0, padding: '0 16px', minHeight: '1.7em' }}>
+                    <span className="ln-num" style={{ minWidth: '2.5rem', paddingRight: 16, fontFamily: 'var(--font-mono)', fontSize: 12 }}>{i + 1}</span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                      {syntaxHighlight(line)}
+                    </span>
+                  </div>
+                ))}
               </div>
             )}
 
+            {/* Console Tab */}
             {activeTab === 'console' && (
               <div style={{ padding: '16px' }}>
                 {logs.map((log, i) => (
@@ -549,15 +618,16 @@ export function WorkspaceView() {
                 )}
                 {isSimulating && loopStep === 2 && (
                   <div style={{ display: 'flex', gap: 8, marginTop: 4, fontFamily: 'var(--font-mono)', fontSize: 12 }} className="pulse">
-                    <span style={{ color: '#4a4540' }}>[{now()}]</span>
+                    <span style={{ color: '#4a4540' }}>[{nowStr()}]</span>
                     <span className="log-exec">EXEC:</span>
-                    <span style={{ color: '#9a9590' }}>Running simulation...</span>
+                    <span style={{ color: '#9a9590' }}>Running simulation…</span>
                   </div>
                 )}
                 <div ref={logsEndRef} />
               </div>
             )}
 
+            {/* Plot Tab */}
             {activeTab === 'plot' && (
               <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div style={{ background: '#0a0908', border: '1px solid #1e1d1b', borderRadius: 8, padding: '16px 12px' }}>
@@ -569,15 +639,18 @@ export function WorkspaceView() {
                       <AreaChart data={plotData} margin={{ top: 5, right: 16, left: -10, bottom: 0 }}>
                         <defs>
                           <linearGradient id="energyGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#c0392b" stopOpacity={0.25} />
+                            <stop offset="5%"  stopColor="#c0392b" stopOpacity={0.25} />
                             <stop offset="95%" stopColor="#c0392b" stopOpacity={0} />
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="2 2" stroke="#1e1d1b" />
-                        <XAxis dataKey="x" stroke="#4a4540" fontSize={10} tickLine={false} axisLine={false} tick={{ fontFamily: 'DM Mono' }} label={{ value: 'Distance (Å)', position: 'insideBottom', fill: '#4a4540', fontSize: 10, fontFamily: 'DM Mono' }} />
+                        <XAxis dataKey="x" stroke="#4a4540" fontSize={10} tickLine={false} axisLine={false}
+                          tick={{ fontFamily: 'DM Mono' }}
+                          label={{ value: 'Distance (Å)', position: 'insideBottom', fill: '#4a4540', fontSize: 10, fontFamily: 'DM Mono' }}
+                        />
                         <YAxis stroke="#4a4540" fontSize={10} tickLine={false} axisLine={false} tick={{ fontFamily: 'DM Mono' }} />
                         <Tooltip contentStyle={{ background: '#0F0E0D', border: '1px solid #1e1d1b', borderRadius: 6, fontSize: 12, fontFamily: 'DM Mono' }} itemStyle={{ color: '#c0392b' }} />
-                        <Area type="monotone" dataKey="energy" stroke="#c0392b" strokeWidth={2} fillOpacity={1} fill="url(#energyGrad)" />
+                        <Area type="monotone" dataKey="energy" name="Energy (eV)" stroke="#c0392b" strokeWidth={2} fillOpacity={1} fill="url(#energyGrad)" />
                       </AreaChart>
                     </ResponsiveContainer>
                   </div>
@@ -586,11 +659,13 @@ export function WorkspaceView() {
                 {/* Tool calls */}
                 {toolCalls.length > 0 && (
                   <div>
-                    <div style={{ fontSize: 11, color: '#4a4540', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Tool Executions</div>
+                    <div style={{ fontSize: 11, color: '#4a4540', fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
+                      Tool Executions ({toolCalls.length})
+                    </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      {toolCalls.slice(-6).map((tc, i) => (
+                      {toolCalls.slice(-8).map((tc, i) => (
                         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: '#0a0908', borderRadius: 6, border: '1px solid #1e1d1b' }}>
-                          <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: tc.status === 'OK' ? '#3a6b5a' : '#c0392b', fontWeight: 700, minWidth: 24 }}>{tc.status}</span>
+                          <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: tc.status === 'OK' ? '#3a6b5a' : '#c0392b', fontWeight: 700, minWidth: 28 }}>{tc.status}</span>
                           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: '#2d4a6e', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tc.name}</span>
                           <span style={{ fontSize: 11, color: '#4a4540', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>{tc.desc}</span>
                         </div>
