@@ -1,6 +1,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { getWorkerUrl } from '../App';
+import {
+  finishRun,
+  recordEvolution,
+  recordTelemetry,
+  recordToolCalls,
+  startRun,
+  updateRunProgress,
+} from '../lib/runtimeData';
 
 interface Phase {
   phase: string;
@@ -87,6 +95,7 @@ export function WorkspaceView({ showToast }: WorkspaceViewProps) {
   const [experimentProblem, setExperimentProblem] = useState('');
   const [toolCalls, setToolCalls]           = useState<{ name: string; desc: string; status: string }[]>([]);
   const [workerConfigured, setWorkerConfigured] = useState(false);
+  const runIdRef = useRef<string | null>(null);
 
   const logsEndRef = useRef<HTMLDivElement>(null);
   const abortRef   = useRef<AbortController | null>(null);
@@ -129,6 +138,13 @@ export function WorkspaceView({ showToast }: WorkspaceViewProps) {
     // Cancel any previous request
     abortRef.current?.abort();
     abortRef.current = new AbortController();
+    const run = startRun({
+      problem: data.problem || '',
+      objectives: data.objectives,
+      constraints: data.constraints,
+      maxIterations: data.iterations || 5,
+    });
+    runIdRef.current = run.id;
 
     setExperimentProblem(data.problem || '');
     setIsSimulating(true);
@@ -201,11 +217,23 @@ export function WorkspaceView({ showToast }: WorkspaceViewProps) {
 
         const handlePhase = (phase: Phase) => {
           setPhases(prev => [...prev, phase]);
+          if (runIdRef.current && phase.iteration) {
+            updateRunProgress(runIdRef.current, { currentIteration: phase.iteration });
+          }
           switch (phase.phase) {
             case 'WRITE_SCRIPT':
               setLoopStep(1);
               setIteration(phase.iteration || 1);
               if (phase.hypothesis) setHypothesis(phase.hypothesis);
+              if (phase.hypothesis) {
+                recordEvolution({
+                  iteration: phase.iteration || 1,
+                  at: new Date().toISOString(),
+                  type: 'hypothesis',
+                  title: `Iteration ${phase.iteration}: hypothesis`,
+                  content: phase.hypothesis,
+                });
+              }
               if (phase.script)     { setCurrentScript(phase.script); setActiveTab('code'); }
               addLog('EXEC', `[Iter ${phase.iteration}] Writing simulation script…`);
               break;
@@ -216,6 +244,12 @@ export function WorkspaceView({ showToast }: WorkspaceViewProps) {
               if (phase.metrics) {
                 const m = phase.metrics;
                 setMetrics({ success_rate: m.success_rate, confidence: m.confidence, key_finding: m.key_finding });
+                recordTelemetry({
+                  at: new Date().toISOString(),
+                  iteration: phase.iteration || 1,
+                  successRate: m.success_rate,
+                  confidence: m.confidence,
+                });
                 addLog('DATA', `Finding: ${m.key_finding}`);
                 const b = -10 - m.confidence * 5;
                 setPlotData(Array.from({ length: 7 }, (_, i) => ({
@@ -230,6 +264,23 @@ export function WorkspaceView({ showToast }: WorkspaceViewProps) {
               addLog('INFO', `[Iter ${phase.iteration}] Analysis — ${phase.passed ? 'PASS ✓' : 'FAIL ✕'}`);
               if (phase.tool_calls) {
                 setToolCalls(prev => [...prev, ...phase.tool_calls!]);
+                recordToolCalls(phase.tool_calls.map(tc => ({
+                  ...tc,
+                  at: new Date().toISOString(),
+                  iteration: phase.iteration,
+                })));
+                recordEvolution({
+                  iteration: phase.iteration || 1,
+                  at: new Date().toISOString(),
+                  type: 'tool-cascade',
+                  title: `Iteration ${phase.iteration}: tool execution`,
+                  content: `${phase.tool_calls.length} tool calls`,
+                  tools: phase.tool_calls.map(tc => ({
+                    ...tc,
+                    at: new Date().toISOString(),
+                    iteration: phase.iteration,
+                  })),
+                });
                 phase.tool_calls.forEach(tc =>
                   addLog(tc.status === 'OK' ? 'EXEC' : 'ERROR', `${tc.name}: ${tc.desc}`)
                 );
@@ -238,6 +289,13 @@ export function WorkspaceView({ showToast }: WorkspaceViewProps) {
             case 'CORRECT_HYPOTHESIS':
               setLoopStep(4);
               if (phase.new_hypothesis) setHypothesis(phase.new_hypothesis);
+              recordEvolution({
+                iteration: phase.iteration || 1,
+                at: new Date().toISOString(),
+                type: 'correction',
+                title: `Iteration ${phase.iteration}: correction`,
+                content: phase.correction || phase.new_hypothesis || 'Self-correction applied',
+              });
               addLog('WARN', `[Iter ${phase.iteration}] Failure: ${(phase.failure_reason || '').slice(0, 100)}`);
               addLog('INFO',  `Self-correcting: ${(phase.correction || '').slice(0, 100)}`);
               break;
@@ -245,6 +303,17 @@ export function WorkspaceView({ showToast }: WorkspaceViewProps) {
               setLoopStep(0);
               setConclusion(phase);
               if (phase.final_hypothesis) setHypothesis(phase.final_hypothesis);
+              if (runIdRef.current) {
+                finishRun(runIdRef.current, phase.success ? 'completed' : 'failed', phase.summary, phase.confidence);
+              }
+              recordEvolution({
+                iteration: phase.iteration || 1,
+                at: new Date().toISOString(),
+                type: phase.success ? 'success' : 'failure',
+                title: `Iteration ${phase.iteration}: conclusion`,
+                content: phase.summary || 'Conclusion generated',
+                confidence: phase.confidence,
+              });
               addLog('INFO', `Concluded [Iter ${phase.iteration}]: ${phase.success ? 'SUCCESS' : 'BEST EFFORT'} — Confidence ${((phase.confidence || 0) * 100).toFixed(0)}%`);
               setIsSimulating(false);
               window.dispatchEvent(new CustomEvent('silicon:simulation-ended'));
@@ -283,6 +352,7 @@ export function WorkspaceView({ showToast }: WorkspaceViewProps) {
         if (err.name === 'AbortError') return;
         addLog('ERROR', `Connection failed: ${err.message}`);
         showToast(`Connection failed: ${err.message}`, 'error');
+        if (runIdRef.current) finishRun(runIdRef.current, 'failed');
         setIsSimulating(false);
         setLoopStep(0);
         window.dispatchEvent(new CustomEvent('silicon:simulation-ended'));
@@ -291,6 +361,7 @@ export function WorkspaceView({ showToast }: WorkspaceViewProps) {
 
   const stopSimulation = () => {
     abortRef.current?.abort();
+    if (runIdRef.current) finishRun(runIdRef.current, 'stopped');
     setIsSimulating(false);
     setLoopStep(0);
     addLog('WARN', 'Research loop halted by user.');

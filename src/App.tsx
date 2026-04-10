@@ -92,6 +92,15 @@ export default function App() {
     return () => window.removeEventListener('silicon:settings-changed', handler);
   }, [checkApi]);
 
+  useEffect(() => {
+    const navHandler = (e: Event) => {
+      const tab = (e as CustomEvent<string>).detail;
+      if (tab) setActiveTab(tab);
+    };
+    window.addEventListener('silicon:nav', navHandler as EventListener);
+    return () => window.removeEventListener('silicon:nav', navHandler as EventListener);
+  }, []);
+
   // Search → navigate to workspace or dashboard
   const handleSearch = useCallback((q: string) => {
     setSearchQuery(q);
