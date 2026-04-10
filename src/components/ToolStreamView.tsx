@@ -1,6 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
-
-// ── Tool Execution Stream: real-time logs of external scientific tools
+import React, { useState, useRef } from 'react';
 
 interface ToolLog {
   id: string;
@@ -13,27 +11,55 @@ interface ToolLog {
   category: string;
 }
 
-const MOCK_TOOLS: ToolLog[] = [
-  { id: 'T001', time: '14:22:10', name: 'CRYSTAL_LATTICE_GEN', description: 'Generating lattice structure for hBN/Graphene/NbSe₂ superlattice with twist angle 1.08°', status: 'ok', duration: '12.4s', output: 'Lattice: hexagonal, a=2.46Å, c=6.70Å, 42 atoms/cell', category: 'DFT' },
-  { id: 'T002', time: '14:22:23', name: 'DFT_BAND_SOLVER', description: 'Computing band structure using PBE functional with spin-orbit coupling', status: 'ok', duration: '45.2s', output: 'Band gap: 0.12eV, Fermi level: -4.32eV, 128 k-points sampled', category: 'DFT' },
-  { id: 'T003', time: '14:23:08', name: 'PHONON_DISPERSION', description: 'Calculating phonon dispersion along Γ-M-K-Γ path', status: 'ok', duration: '1m 23s', output: 'No imaginary frequencies detected. Max frequency: 1580 cm⁻¹', category: 'MD' },
-  { id: 'T004', time: '14:24:31', name: 'THERMAL_FLUCT_MODEL', description: 'Simulating thermal fluctuations at 152K using Nosé-Hoover thermostat', status: 'error', duration: '32.1s', output: 'ERROR: Phonon scattering divergence at NbSe₂ interface layer 3', category: 'MD' },
-  { id: 'T005', time: '14:25:03', name: 'SELF_CORRECT_TRIGGER', description: 'K2 initiating self-correction cycle — adjusting interlayer coupling parameters', status: 'ok', duration: '2.1s', output: 'Correction: Van der Waals radius increased by 4.2% for NbSe₂-hBN interface', category: 'AGENT' },
-  { id: 'T006', time: '14:25:06', name: 'HAMILTONIAN_MATRIX_OP', description: 'Diagonalizing 2048×2048 tight-binding Hamiltonian', status: 'ok', duration: '8.7s', output: 'Eigenvalues computed. Flat band detected at -0.003eV near Fermi level', category: 'QM' },
-  { id: 'T007', time: '14:25:15', name: 'MONTE_CARLO_SIM', description: 'Running 10⁶ MC steps for thermodynamic sampling at 152K', status: 'ok', duration: '2m 40s', output: 'Free energy: -14.22 eV/atom, Entropy: 0.042 eV/K, Phase: stable', category: 'SIM' },
-  { id: 'T008', time: '14:27:55', name: 'VISCOSITY_CALC', description: 'Computing electrolyte viscosity using Green-Kubo formalism', status: 'ok', duration: '18.3s', output: 'η = 8.92 × 10⁻⁴ Pa·s at 298K', category: 'MD' },
-  { id: 'T009', time: '14:28:14', name: 'ION_PATH_TRACE', description: 'Tracing ionic diffusion pathways through lattice channels', status: 'running', duration: '—', category: 'SIM' },
-  { id: 'T010', time: '14:28:14', name: 'ELIASHBERG_SOLVER', description: 'Solving Eliashberg equations for superconducting Tc prediction', status: 'queued', category: 'QM' },
+const INITIAL_TOOLS: ToolLog[] = [
+  { id: 'T001', time: '14:22:10', name: 'CRYSTAL_LATTICE_GEN',   description: 'Generating lattice structure for hBN/Graphene/NbSe₂ superlattice with twist angle 1.08°', status: 'ok',      duration: '12.4s',  output: 'Lattice: hexagonal, a=2.46Å, c=6.70Å, 42 atoms/cell',                           category: 'DFT'   },
+  { id: 'T002', time: '14:22:23', name: 'DFT_BAND_SOLVER',       description: 'Computing band structure using PBE functional with spin-orbit coupling',                  status: 'ok',      duration: '45.2s',  output: 'Band gap: 0.12eV, Fermi level: -4.32eV, 128 k-points sampled',                   category: 'DFT'   },
+  { id: 'T003', time: '14:23:08', name: 'PHONON_DISPERSION',     description: 'Calculating phonon dispersion along Γ-M-K-Γ path',                                        status: 'ok',      duration: '1m 23s', output: 'No imaginary frequencies detected. Max frequency: 1580 cm⁻¹',                    category: 'MD'    },
+  { id: 'T004', time: '14:24:31', name: 'THERMAL_FLUCT_MODEL',   description: 'Simulating thermal fluctuations at 152K using Nosé-Hoover thermostat',                    status: 'error',   duration: '32.1s',  output: 'ERROR: Phonon scattering divergence at NbSe₂ interface layer 3',                 category: 'MD'    },
+  { id: 'T005', time: '14:25:03', name: 'SELF_CORRECT_TRIGGER',  description: 'K2 initiating self-correction cycle — adjusting interlayer coupling parameters',           status: 'ok',      duration: '2.1s',   output: 'Correction: Van der Waals radius increased by 4.2% for NbSe₂-hBN interface',   category: 'AGENT' },
+  { id: 'T006', time: '14:25:06', name: 'HAMILTONIAN_MATRIX_OP', description: 'Diagonalizing 2048×2048 tight-binding Hamiltonian',                                       status: 'ok',      duration: '8.7s',   output: 'Eigenvalues computed. Flat band detected at -0.003eV near Fermi level',           category: 'QM'    },
+  { id: 'T007', time: '14:25:15', name: 'MONTE_CARLO_SIM',       description: 'Running 10⁶ MC steps for thermodynamic sampling at 152K',                                  status: 'ok',      duration: '2m 40s', output: 'Free energy: -14.22 eV/atom, Entropy: 0.042 eV/K, Phase: stable',               category: 'SIM'   },
+  { id: 'T008', time: '14:27:55', name: 'VISCOSITY_CALC',        description: 'Computing electrolyte viscosity using Green-Kubo formalism',                               status: 'ok',      duration: '18.3s',  output: 'η = 8.92 × 10⁻⁴ Pa·s at 298K',                                                  category: 'MD'    },
+  { id: 'T009', time: '14:28:14', name: 'ION_PATH_TRACE',        description: 'Tracing ionic diffusion pathways through lattice channels',                                status: 'running', duration: '—',                                                                                                        category: 'SIM'   },
+  { id: 'T010', time: '14:28:14', name: 'ELIASHBERG_SOLVER',     description: 'Solving Eliashberg equations for superconducting Tc prediction',                           status: 'queued',                                                                                                                    category: 'QM'    },
 ];
 
 const CATEGORIES = ['ALL', 'DFT', 'MD', 'QM', 'SIM', 'AGENT'];
 
+function exportLog(tools: ToolLog[]) {
+  const header = 'Time,Name,Category,Status,Duration,Description,Output\n';
+  const rows = tools.map(t =>
+    `${t.time},"${t.name}",${t.category},${t.status},${t.duration || ''},"${t.description}","${t.output || ''}"`
+  ).join('\n');
+  const blob = new Blob([header + rows], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `tool_stream_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function ToolStreamView() {
-  const [tools] = useState<ToolLog[]>(MOCK_TOOLS);
-  const [filterCat, setFilterCat] = useState('ALL');
+  const [tools, setTools] = useState<ToolLog[]>(INITIAL_TOOLS);
+  const [filterCat, setFilterCat]       = useState('ALL');
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedId, setExpandedId]     = useState<string | null>(null);
+  const [refreshing, setRefreshing]     = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    // Simulate refresh — reset running/queued to reflect a newer state
+    setTimeout(() => {
+      setTools(prev => prev.map(t => {
+        if (t.status === 'running') return { ...t, status: 'ok' as const, duration: '45.1s', output: 'Computation complete.' };
+        if (t.status === 'queued') return { ...t, status: 'running' as const, duration: '—' };
+        return t;
+      }));
+      setRefreshing(false);
+    }, 800);
+  };
 
   const filtered = tools.filter(t => {
     if (filterCat !== 'ALL' && t.category !== filterCat) return false;
@@ -43,28 +69,28 @@ export function ToolStreamView() {
 
   const statusIcon = (s: string) => {
     switch (s) {
-      case 'ok': return '✓';
-      case 'error': return '✕';
+      case 'ok':      return '✓';
+      case 'error':   return '✕';
       case 'running': return '◌';
-      case 'queued': return '⋯';
-      default: return '?';
+      case 'queued':  return '⋯';
+      default:        return '?';
     }
   };
 
   const statusColor = (s: string) => {
     switch (s) {
-      case 'ok': return 'var(--accent-sage)';
-      case 'error': return 'var(--accent)';
+      case 'ok':      return 'var(--accent-sage)';
+      case 'error':   return 'var(--accent)';
       case 'running': return 'var(--accent-warm)';
-      case 'queued': return 'var(--ink-muted)';
-      default: return 'var(--ink-muted)';
+      case 'queued':  return 'var(--ink-muted)';
+      default:        return 'var(--ink-muted)';
     }
   };
 
   const stats = {
-    total: tools.length,
-    ok: tools.filter(t => t.status === 'ok').length,
-    error: tools.filter(t => t.status === 'error').length,
+    total:   tools.length,
+    ok:      tools.filter(t => t.status === 'ok').length,
+    error:   tools.filter(t => t.status === 'error').length,
     running: tools.filter(t => t.status === 'running').length,
   };
 
@@ -81,18 +107,28 @@ export function ToolStreamView() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn-ghost" style={{ fontSize: 12 }}>↓ Export Log</button>
-          <button className="btn-ghost" style={{ fontSize: 12 }}>⟳ Refresh</button>
+          <button className="btn-ghost" style={{ fontSize: 12 }} onClick={() => exportLog(filtered)}>
+            ↓ Export Log
+          </button>
+          <button
+            className="btn-ghost"
+            style={{ fontSize: 12 }}
+            onClick={handleRefresh}
+            disabled={refreshing}
+          >
+            <span className={refreshing ? 'spin' : ''} style={{ display: 'inline-block' }}>⟳</span>
+            {refreshing ? ' Refreshing…' : ' Refresh'}
+          </button>
         </div>
       </div>
 
       {/* Stats Strip */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
         {[
-          { label: 'Total Calls', value: stats.total, color: 'var(--ink)' },
-          { label: 'Succeeded', value: stats.ok, color: 'var(--accent-sage)' },
-          { label: 'Failed', value: stats.error, color: 'var(--accent)' },
-          { label: 'Running', value: stats.running, color: 'var(--accent-warm)' },
+          { label: 'Total Calls',  value: stats.total,   color: 'var(--ink)' },
+          { label: 'Succeeded',    value: stats.ok,      color: 'var(--accent-sage)' },
+          { label: 'Failed',       value: stats.error,   color: 'var(--accent)' },
+          { label: 'Running',      value: stats.running, color: 'var(--accent-warm)' },
         ].map((s, i) => (
           <div key={i} className="metric-card" style={{ padding: '14px 16px' }}>
             <div style={{ fontSize: 10, color: 'var(--ink-muted)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>{s.label}</div>
@@ -102,17 +138,19 @@ export function ToolStreamView() {
       </div>
 
       {/* Filters */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' }}>
         <span style={{ fontSize: 11, color: 'var(--ink-muted)', fontWeight: 600, marginRight: 4 }}>Category:</span>
         {CATEGORIES.map(cat => (
-          <button key={cat} className={`tab-btn ${filterCat === cat ? 'active' : ''}`} onClick={() => setFilterCat(cat)} style={{ fontSize: 11, padding: '4px 10px' }}>
+          <button key={cat} className={`tab-btn ${filterCat === cat ? 'active' : ''}`}
+            onClick={() => setFilterCat(cat)} style={{ fontSize: 11, padding: '4px 10px' }}>
             {cat}
           </button>
         ))}
         <div style={{ width: 1, height: 20, background: 'var(--rule)', margin: '0 8px' }} />
         <span style={{ fontSize: 11, color: 'var(--ink-muted)', fontWeight: 600, marginRight: 4 }}>Status:</span>
         {['all', 'ok', 'error', 'running'].map(s => (
-          <button key={s} className={`tab-btn ${filterStatus === s ? 'active' : ''}`} onClick={() => setFilterStatus(s)} style={{ fontSize: 11, padding: '4px 10px', textTransform: 'capitalize' }}>
+          <button key={s} className={`tab-btn ${filterStatus === s ? 'active' : ''}`}
+            onClick={() => setFilterStatus(s)} style={{ fontSize: 11, padding: '4px 10px', textTransform: 'capitalize' }}>
             {s}
           </button>
         ))}
@@ -120,6 +158,11 @@ export function ToolStreamView() {
 
       {/* Tool Logs */}
       <div className="card" style={{ overflow: 'hidden' }}>
+        {filtered.length === 0 && (
+          <div style={{ padding: '32px', textAlign: 'center', color: 'var(--ink-muted)', fontSize: 13 }}>
+            No tool executions match the current filter.
+          </div>
+        )}
         {filtered.map((tool, i) => (
           <div
             key={tool.id}
@@ -148,18 +191,24 @@ export function ToolStreamView() {
               {/* Content */}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: 'var(--ink)', letterSpacing: '0.02em' }}>{tool.name}</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700, color: 'var(--ink)', letterSpacing: '0.02em' }}>
+                    {tool.name}
+                  </span>
                   <span className={`tag ${tool.category === 'DFT' ? 'blue' : tool.category === 'MD' ? 'gold' : tool.category === 'QM' ? 'red' : tool.category === 'AGENT' ? 'green' : 'muted'}`}>
                     {tool.category}
                   </span>
                 </div>
-                <p style={{ fontSize: 12.5, color: 'var(--ink-muted)', margin: 0, lineHeight: 1.4 }} className="truncate">{tool.description}</p>
+                <p style={{ fontSize: 12.5, color: 'var(--ink-muted)', margin: 0, lineHeight: 1.4 }} className="truncate">
+                  {tool.description}
+                </p>
               </div>
 
               {/* Meta */}
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0 }}>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-muted)' }}>{tool.time}</span>
-                {tool.duration && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--ink-muted)', marginTop: 2 }}>{tool.duration}</span>}
+                {tool.duration && (
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--ink-muted)', marginTop: 2 }}>{tool.duration}</span>
+                )}
               </div>
             </div>
 
