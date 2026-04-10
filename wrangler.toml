@@ -1,0 +1,3 @@
+name = "silicon-scientist"
+main = "worker.js"
+compatibility_date = "2026-02-13"

@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Silicon Scientist - Editorial Pitch Deck</title>
+    
+    <!-- Reveal.js CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.css">
+    
+    <!-- Premium Fonts: DM Sans -->
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap" rel="stylesheet">
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <style>
+        :root {
+            /* Editorial Premium Light Theme */
+            --white: #ffffff;
+            --off-white: #fafaf9;
+            --paper: #f5f4f1;
+            --rule: #e2e0db;
+            --rule-light: #edebe7;
+            --ink: #111110;
+            --ink-mid: #3a3935;
+            --ink-muted: #7a7870;
+            --accent: #2c3e50; /* Changed from red to deep tech blue */
+            --accent-warm: #d4512a;
+            --accent-gold: #b8922a;
+            --accent-sage: #3a6b5a;
+            --accent-slate: #2d4a6e;
+            --accent-indigo: #4f46e5;
+            --nav-h: 64px;
+        }
+
+        body {
+            background-color: var(--off-white);
+            font-family: 'DM Sans', sans-serif;
+            color: var(--ink);
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        .reveal .slides {
+            font-family: 'DM Sans', sans-serif;
+            text-align: left;
+        }
+
+        .reveal h1, .reveal h2, .reveal h3, .reveal h4 {
+            font-family: 'DM Sans', sans-serif;
+            text-transform: none;
+            color: var(--ink);
+            font-weight: 400;
+        }
+
+        .reveal h1 { font-size: 5rem; letter-spacing: -0.04em; line-height: 1.05; margin-bottom: 24px; color: var(--ink); }
+        .reveal h2 { font-size: 3.2rem; letter-spacing: -0.02em; margin-bottom: 40px; border-bottom: 1px solid var(--rule); padding-bottom: 16px; color: var(--ink); }
+        .reveal h3 { font-size: 1.6rem; font-weight: 500; color: var(--ink-mid); margin-bottom: 12px; }
+
+        .reveal p, .reveal li {
+            font-size: 1.25rem;
+            line-height: 1.6;
+            color: var(--ink-muted);
+            font-weight: 400;
+        }
+        
+        .reveal strong, .emphasis { color: var(--ink); font-weight: 500; }
+
+        /* Elegant Grid Systems */
+        .grid-split {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 60px;
+            align-items: center;
+            height: 100%;
+        }
+        
+        .grid-split-img-left { grid-template-columns: 5fr 4fr; }
+        .grid-split-img-right { grid-template-columns: 4fr 5fr; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; }
+        .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+
+        .slide-content-wrapper {
+            padding: 0 40px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        /* Premium Image Containers */
+        .editorial-image-container {
+            width: 100%;
+            height: 80vh;
+            background: var(--paper);
+            border: 1px solid var(--rule);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            box-sizing: border-box;
+            border-radius: 12px;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.02);
+        }
+        
+        .editorial-image-container img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15);
+            border: 1px solid var(--rule-light);
+            border-radius: 8px;
+        }
+
+        .tag-pill {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 6px 16px; border-radius: 100px;
+            font-size: 0.8rem; font-weight: 500; margin-bottom: 24px;
+            text-transform: uppercase; letter-spacing: 0.05em;
+            background: var(--white);
+            border: 1px solid var(--rule);
+            color: var(--ink-mid);
+        }
+        .tag-sage { color: var(--accent-sage); background: rgba(58, 107, 90, 0.05); border-color: rgba(58, 107, 90, 0.2); }
+        .tag-slate { color: var(--accent-slate); background: rgba(45, 74, 110, 0.05); border-color: rgba(45, 74, 110, 0.2); }
+        .tag-warm { color: var(--accent-warm); background: rgba(212, 81, 42, 0.05); border-color: rgba(212, 81, 42, 0.2); }
+        .tag-indigo { color: var(--accent-indigo); background: rgba(79, 70, 229, 0.05); border-color: rgba(79, 70, 229, 0.2); }
+
+        .clean-card {
+            background: var(--white);
+            border: 1px solid var(--rule);
+            padding: 32px;
+            height: 100%;
+            box-sizing: border-box;
+            border-radius: 8px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .clean-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);
+        }
+        
+        .clean-card-minimal {
+            border-top: 2px solid var(--ink);
+            padding-top: 20px;
+        }
+
+        .lucide { width: 32px; height: 32px; stroke-width: 1.5; color: var(--ink-mid); margin-bottom: 16px; }
+
+        ul.clean-list { list-style: none; padding: 0; margin: 0; }
+        ul.clean-list li {
+            position: relative; padding-left: 24px; margin-bottom: 16px;
+            border-bottom: 1px solid var(--rule-light); padding-bottom: 16px;
+        }
+        ul.clean-list li:last-child { border-bottom: none; }
+        ul.clean-list li::before {
+            content: '—'; position: absolute; left: 0; color: var(--accent-indigo); font-weight: 500;
+        }
+        ul.clean-list.danger::before { color: var(--accent-warm); }
+
+        table.editorial-table { width: 100%; border-collapse: collapse; margin-top: 24px; font-size: 1.15rem; }
+        table.editorial-table th { text-align: left; padding: 16px; color: var(--ink); font-weight: 500; border-bottom: 2px solid var(--ink); text-transform: uppercase; font-size: 0.85rem; letter-spacing: 0.05em; }
+        table.editorial-table td { padding: 16px; color: var(--ink-muted); border-bottom: 1px solid var(--rule); }
+        table.editorial-table tr:last-child td { border-bottom: 1px solid var(--ink); }
+
+        .k2-tag {
+            font-family: 'DM Sans', monospace; font-size: 0.9em; background: var(--paper);
+            padding: 4px 8px; border: 1px solid rgba(79, 70, 229, 0.3); border-radius: 6px;
+            color: var(--accent-indigo);
+            font-weight: 600;
+        }
+
+        .slide-center {
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
+            align-items: center !important;
+            text-align: center !important;
+            height: 100% !important;
+        }
+
+        .reveal .controls { color: var(--ink-muted); }
+        .reveal .progress { height: 3px; background: var(--rule); }
+        .reveal .progress span { background: var(--accent-indigo); }
+    </style>
+</head>
+<body>
+
+<div class="reveal">
+    <div class="slides">
+
+        <!-- Slide 1: Title -->
+        <section>
+            <div class="grid-split grid-split-img-left">
+                <div class="editorial-image-container">
+                    <img src="images/Screenshot (271).png" alt="Silicon Scientist Dashboard">
+                </div>
+                <div class="slide-content-wrapper">
+                    <div class="tag-pill tag-indigo"><i data-lucide="cpu" style="width: 14px; height: 14px; margin: 0; color: inherit;"></i> K2 Think Hackathon</div>
+                    <h1 style="font-size: 4.5rem;">The Silicon Scientist</h1>
+                    <p style="font-size: 1.6rem; color: var(--ink); margin-bottom: 40px;">Universal Autonomous AI Research Agent</p>
+                    <div style="border-left: 2px solid var(--accent-indigo); padding-left: 20px;">
+                        <p style="margin:0; font-size: 1.1rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-mid); font-weight: 600;">
+                            Hypothesize <span style="color:var(--rule);">/</span> Execute <span style="color:var(--rule);">/</span> <span style="color:var(--accent-indigo);">Iterate</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 2: Problem -->
+        <section>
+            <div class="slide-content-wrapper" style="padding: 0 100px;">
+                <div class="tag-pill tag-warm">The R&D Bottleneck</div>
+                <h2>The Human Limit in Science</h2>
+                <div class="grid-split" style="gap: 40px; margin-top: 40px;">
+                    <div>
+                        <ul class="clean-list">
+                            <li>Manual scientific experimentation is <span class="emphasis">too slow</span></li>
+                            <li>Hypotheses are limited by human execution bandwidth</li>
+                            <li>Significant time is lost on boilerplate code & metric gathering</li>
+                            <li>Literature review is disconnected from actual testing</li>
+                        </ul>
+                    </div>
+                    <div class="clean-card">
+                        <i data-lucide="microscope" style="color: var(--accent-warm);"></i>
+                        <h3 style="color: var(--ink);">Direct Impact</h3>
+                        <p style="margin-bottom: 12px; margin-top: 16px;"><strong style="color: var(--accent-warm);">Slower Discovery:</strong> Months spent validating single insights</p>
+                        <p style="margin-bottom: 12px;"><strong style="color: var(--accent-warm);">Bias & Errors:</strong> Human inconsistencies in testing loops</p>
+                        <p><strong style="color: var(--accent-warm);">Knowledge Gap:</strong> ArXiv moves faster than humans can read & reproduce</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 3: The Gap -->
+        <section>
+            <div class="grid-split grid-split-img-right">
+                <div class="slide-content-wrapper">
+                    <div class="tag-pill tag-indigo">The Industry Evolution</div>
+                    <h2>Chatbots vs. Agentic Scientists</h2>
+                    
+                    <h3 style="margin-top: 20px;">Current "R&D AI"</h3>
+                    <ul class="clean-list" style="margin-bottom: 30px;">
+                        <li>Outputs static text responses to questions</li>
+                        <li>Requires humans to copy, paste, run, and feedback errors</li>
+                        <li>It acts as an <i>encyclopedia</i>, not an actor</li>
+                    </ul>
+
+                    <h3 style="color: var(--ink);">The Silicon Scientist Paradigm</h3>
+                    <ul class="clean-list">
+                        <li><strong class="emphasis">Formulates</strong> algorithmic hypotheses autonomously</li>
+                        <li><strong class="emphasis">Writes & Compiles</strong> real Python simulation code</li>
+                        <li><strong class="emphasis">Evaluates</strong> error metrics & iteratively auto-corrects</li>
+                    </ul>
+                </div>
+                <div class="editorial-image-container">
+                    <img src="images/Screenshot (274).png" alt="Experiment Execution">
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 4: System Architecture -->
+        <section>
+            <div class="slide-content-wrapper" style="padding: 0 100px;">
+                <div class="tag-pill tag-slate">Technical Foundation</div>
+                <h2>Agentic Architecture</h2>
+                
+                <div class="grid-split" style="margin-top: 40px; align-items: start;">
+                    <div class="clean-card-minimal">
+                        <i data-lucide="server"></i>
+                        <h3>Edge-Orchestrated Loop</h3>
+                        <p style="margin-bottom: 16px;">Built entirely on Cloudflare Workers edge nodes, streaming telemetry natively via SSE.</p>
+                        <p style="font-size: 1.1rem; margin-bottom: 8px;">• Real-time SSE State Streaming</p>
+                        <p style="font-size: 1.1rem; margin-bottom: 8px;">• Piston API Secure Python Sandbox</p>
+                        <p style="font-size: 1.1rem;">• React Vite Component Driven UI</p>
+                    </div>
+                    <div class="clean-card-minimal">
+                        <i data-lucide="brain-circuit" style="color: var(--accent-indigo);"></i>
+                        <h3>Cognitive Core</h3>
+                        <p style="margin-bottom: 16px;">Direct separation of reasoning vs execution:</p>
+                        <p style="font-size: 1.1rem; margin-bottom: 12px;"><span class="k2-tag">K2-Think-v2</span> Hypothesis generation, script synthesis, post-execution analysis and self-correction</p>
+                        <p style="font-size: 1.1rem; margin-bottom: 12px;"><span class="k2-tag">Piston Engine</span> Turing-complete untrusted code execution wrapper returning exact STDOUT metrics</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 5: Strict Usage of K2 -->
+        <section>
+            <div class="slide-content-wrapper" style="padding: 0 80px;">
+                <div class="tag-pill tag-indigo">Model Utilization</div>
+                <h2>Why we use <span class="k2-tag" style="font-size: 0.8em;">K2-Think-v2</span></h2>
+                <p>The Silicon Scientist's intelligence engine relies completely on K2's immense reasoning capability.</p>
+                
+                <table class="editorial-table">
+                    <thead>
+                        <tr>
+                            <th>Module / Phase</th>
+                            <th>K2-Think Role</th>
+                            <th>Intelligence Profile</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong class="emphasis">Hypothesis Formulation</strong></td>
+                            <td><span class="k2-tag">Analytic Synthesis</span></td>
+                            <td>Parses raw academic constraints to define a testable, 2-3 sentence execution plan limit.</td>
+                        </tr>
+                        <tr>
+                            <td><strong class="emphasis">Code Generation</strong></td>
+                            <td><span class="k2-tag">Deterministic Coding</span></td>
+                            <td>Generates isolated Python sandbox code strictly adhering to stdlib+numpy rules with JSON output mapping.</td>
+                        </tr>
+                        <tr>
+                            <td><strong class="emphasis">Artifact Creation</strong></td>
+                            <td><span class="k2-tag">Visual Framing</span></td>
+                            <td>Generates dynamic, inline-styled HTML blocks inside ```html grids to visualize data insights cleanly.</td>
+                        </tr>
+                        <tr>
+                            <td><strong class="emphasis">Iterative Self-Correction</strong></td>
+                            <td><span class="k2-tag">Feedback Loop</span></td>
+                            <td>Reads previous python traceback or failure metric, adapts logic, & writes a new revision iteratively.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Slide 6: Continuous Agent Loop -->
+        <section>
+            <div class="grid-split grid-split-img-left">
+                <div class="editorial-image-container">
+                    <img src="images/Screenshot (272).png" alt="Evolution Log">
+                </div>
+                <div class="slide-content-wrapper">
+                    <div class="tag-pill tag-sage">Flagship Feature</div>
+                    <h2>The Autonomous Loop</h2>
+                    <p style="margin-bottom: 24px;">The agent iterates until it validates its hypothesis or hits success constraints.</p>
+                    
+                    <ul class="clean-list">
+                        <li><strong class="emphasis">Plan:</strong> Create structural thesis from context.</li>
+                        <li><strong class="emphasis">Write:</strong> Generate robust experimental code.</li>
+                        <li><strong class="emphasis">Execute:</strong> Send to execution securely, await <code>stdout</code>.</li>
+                        <li><strong class="emphasis">Analyze:</strong> If metric < 85%, adjust hypothesis & restart.</li>
+                    </ul>
+                    
+                    <div style="background: var(--paper); padding: 16px; border: 1px solid var(--rule); margin-top: 24px;">
+                        <p style="margin: 0; font-size: 1.1rem;">Driven explicitly by K2-Think's continuous prompt-chain parsing.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 7: Research Browser -->
+        <section>
+            <div class="grid-split grid-split-img-right">
+                <div class="slide-content-wrapper">
+                    <div class="tag-pill tag-slate">Live Context</div>
+                    <h2>Integrated ArXiv Browser</h2>
+                    <p style="margin-bottom: 24px;">No more manually copying and pasting abstracts to ChatGPT.</p>
+                    
+                    <ul class="clean-list">
+                        <li><strong class="emphasis">Live Sync:</strong> Direct queries to export.arxiv.org API.</li>
+                        <li><strong class="emphasis">One-Click Launch:</strong> Sends title & abstract directly into K2's initialization prompt.</li>
+                        <li><strong class="emphasis">Domain Agnostic:</strong> From ML & Quantum Computing to Bioinformatics & Drug Discovery.</li>
+                    </ul>
+
+                    <div class="clean-card-minimal" style="margin-top: 30px; border-top-color: var(--accent-slate);">
+                        <h3 style="font-size: 1.2rem; color: var(--ink);">Instant Reproducibility</h3>
+                        <p style="font-size: 1.1rem; margin: 0;">Silicon Scientist automatically attempts to reproduce or extend key insights from newly published papers.</p>
+                    </div>
+                </div>
+                <div class="editorial-image-container">
+                    <img src="images/Screenshot (278).png" alt="ArXiv Research Browser">
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 8: Visual Artifacts -->
+        <section>
+            <div class="grid-split grid-split-img-left">
+                <div class="editorial-image-container">
+                    <img src="images/Screenshot (275).png" alt="Dynamic Visual Artifacts">
+                </div>
+                <div class="slide-content-wrapper">
+                    <div class="tag-pill tag-sage">Generative UI</div>
+                    <h2>Dynamic Artifacts</h2>
+                    
+                    <p style="margin-bottom: 30px;">
+                        Instead of boring terminal text, K2-Think generates styled, responsive HTML components in real-time.
+                    </p>
+                    
+                    <div style="margin-bottom: 20px;">
+                        <h3>Self-Contained Reporting</h3>
+                        <p style="font-size: 1.15rem; margin-bottom: 8px;">Every iteration provides visual evidence (metrics, tables, confidence intervals) rendered inline.</p>
+                        <p style="font-family: monospace; font-size: 0.95rem; color: var(--ink-muted); background: var(--paper); padding: 8px; display: inline-block;">```html<br/>&lt;div class="grid"&gt;...&lt;/div&gt;<br/>```</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 9: Transparent Telemetry -->
+        <section>
+            <div class="grid-split grid-split-img-right">
+                <div class="slide-content-wrapper">
+                    <div class="tag-pill tag-gold">Observability</div>
+                    <h2>Tool Stream Telemetry</h2>
+                    <p style="margin-bottom: 24px;">Black box agents are dangerous in science. We built an X-ray for thought.</p>
+                    
+                    <ul class="clean-list">
+                        <li><strong class="emphasis">Complete Traceability:</strong> See every token generated, script executed, and error returned.</li>
+                        <li><strong class="emphasis">Performance Stats:</strong> Live monitoring of compute time and confidence progression.</li>
+                        <li><strong class="emphasis">Trust through Visibility:</strong> Every step validates its success criteria against raw output.</li>
+                    </ul>
+                </div>
+                <div class="editorial-image-container">
+                    <img src="images/Screenshot (276).png" alt="Telemetry">
+                </div>
+            </div>
+        </section>
+
+        <!-- Slide 10: Closing -->
+        <section class="slide-center">
+            <h1 style="font-size: 5rem; margin-bottom: 10px;">The Silicon Scientist</h1>
+            <p style="font-family: 'DM Sans', sans-serif; font-size: 1.8rem; color: var(--ink-mid); margin-top: 20px; letter-spacing: 0.1em; text-transform: uppercase;">
+                Powered by K2 Think V2
+            </p>
+            
+            <div style="margin-top: 60px; padding: 40px; max-width: 900px; text-align: center; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);">
+                <h3 style="font-size: 2.2rem; line-height: 1.5; font-weight: 400; color: var(--ink);">
+                    "We built an autonomous agent that doesn't just read about cutting-edge science — <strong class="emphasis" style="color: var(--accent-indigo);">it writes the code to prove it.</strong>"
+                </h3>
+            </div>
+        </section>
+
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/4.6.1/reveal.min.js"></script>
+<script>
+    lucide.createIcons();
+    Reveal.initialize({
+        controls: false, // Cleaner UI
+        progress: true,
+        center: true,
+        hash: true,
+        transition: 'none', // Editorial feel, no distracting animations
+        backgroundTransition: 'none',
+        width: 1280,
+        height: 720,
+        margin: 0.08,
+        minScale: 0.2,
+        maxScale: 2.0
+    });
+</script>
+</body>
+</html>
