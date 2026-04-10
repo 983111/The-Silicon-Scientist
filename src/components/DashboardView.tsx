@@ -22,6 +22,7 @@ const convergenceData = Array.from({ length: 20 }, (_, i) => ({
 
 interface DashboardViewProps {
   onNewExperiment: () => void;
+  onNavigate: (tab: string) => void;
 }
 
 const RECENT_EXPERIMENTS = [
@@ -41,15 +42,19 @@ const ACTIVITY = [
   { time: '3h ago', msg: 'Script monte_carlo_v2.py optimized — 12% faster', type: 'tool' },
 ];
 
-export function DashboardView({ onNewExperiment }: DashboardViewProps) {
-  const [now, setNow] = useState(new Date());
-  useEffect(() => { const t = setInterval(() => setNow(new Date()), 60000); return () => clearInterval(t); }, []);
+const statusTagClass = (s: string) => {
+  if (s === 'completed') return 'green';
+  if (s === 'running')   return 'gold';
+  if (s === 'failed')    return 'red';
+  return 'muted';
+};
 
-  const statusColor = (s: string) => {
-    if (s === 'completed') return 'green';
-    if (s === 'running') return 'gold';
-    return 'red';
-  };
+export function DashboardView({ onNewExperiment, onNavigate }: DashboardViewProps) {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(t);
+  }, []);
 
   return (
     <div className="scroll-area" style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
@@ -93,11 +98,9 @@ export function DashboardView({ onNewExperiment }: DashboardViewProps) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, marginBottom: 24 }}>
         {/* Weekly Experiments */}
         <div className="card" style={{ padding: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-            <div>
-              <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 600, margin: 0 }}>Weekly Activity</h3>
-              <p style={{ fontSize: 12, color: 'var(--ink-muted)', margin: '2px 0 0' }}>Experiments launched & succeeded</p>
-            </div>
+          <div style={{ marginBottom: 16 }}>
+            <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 600, margin: 0 }}>Weekly Activity</h3>
+            <p style={{ fontSize: 12, color: 'var(--ink-muted)', margin: '2px 0 0' }}>Experiments launched & succeeded</p>
           </div>
           <div style={{ height: 200 }}>
             <ResponsiveContainer width="100%" height="100%">
@@ -106,8 +109,8 @@ export function DashboardView({ onNewExperiment }: DashboardViewProps) {
                 <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#7a7870', fontFamily: 'DM Mono' }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 11, fill: '#7a7870', fontFamily: 'DM Mono' }} axisLine={false} tickLine={false} />
                 <Tooltip contentStyle={{ background: 'var(--white)', border: '1px solid var(--rule)', borderRadius: 8, fontSize: 12, fontFamily: 'DM Mono' }} />
-                <Bar dataKey="experiments" fill="var(--accent)" radius={[4, 4, 0, 0]} opacity={0.25} />
-                <Bar dataKey="success" fill="var(--accent)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="experiments" name="Launched" fill="var(--accent)" radius={[4, 4, 0, 0]} opacity={0.25} />
+                <Bar dataKey="success" name="Succeeded" fill="var(--accent)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -115,11 +118,9 @@ export function DashboardView({ onNewExperiment }: DashboardViewProps) {
 
         {/* Convergence Curve */}
         <div className="card" style={{ padding: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-            <div>
-              <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 600, margin: 0 }}>Convergence Trend</h3>
-              <p style={{ fontSize: 12, color: 'var(--ink-muted)', margin: '2px 0 0' }}>Loss & confidence across iterations</p>
-            </div>
+          <div style={{ marginBottom: 16 }}>
+            <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 600, margin: 0 }}>Convergence Trend</h3>
+            <p style={{ fontSize: 12, color: 'var(--ink-muted)', margin: '2px 0 0' }}>Loss & confidence across iterations</p>
           </div>
           <div style={{ height: 200 }}>
             <ResponsiveContainer width="100%" height="100%">
@@ -138,8 +139,8 @@ export function DashboardView({ onNewExperiment }: DashboardViewProps) {
                 <XAxis dataKey="iter" tick={{ fontSize: 10, fill: '#7a7870', fontFamily: 'DM Mono' }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 10, fill: '#7a7870', fontFamily: 'DM Mono' }} axisLine={false} tickLine={false} />
                 <Tooltip contentStyle={{ background: 'var(--white)', border: '1px solid var(--rule)', borderRadius: 8, fontSize: 12, fontFamily: 'DM Mono' }} />
-                <Area type="monotone" dataKey="confidence" stroke="#3a6b5a" strokeWidth={2} fill="url(#confGrad)" />
-                <Area type="monotone" dataKey="loss" stroke="#c0392b" strokeWidth={1.5} fill="url(#lossGrad)" />
+                <Area type="monotone" dataKey="confidence" name="Confidence" stroke="#3a6b5a" strokeWidth={2} fill="url(#confGrad)" />
+                <Area type="monotone" dataKey="loss" name="Loss" stroke="#c0392b" strokeWidth={1.5} fill="url(#lossGrad)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -152,7 +153,13 @@ export function DashboardView({ onNewExperiment }: DashboardViewProps) {
         <div className="card" style={{ overflow: 'hidden' }}>
           <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--rule)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 15, fontWeight: 600, margin: 0 }}>Recent Experiments</h3>
-            <button className="btn-ghost" style={{ padding: '5px 10px', fontSize: 12 }}>View All →</button>
+            <button
+              className="btn-ghost"
+              style={{ padding: '5px 10px', fontSize: 12 }}
+              onClick={() => onNavigate('evolution-log')}
+            >
+              View All →
+            </button>
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table className="data-table">
@@ -168,11 +175,19 @@ export function DashboardView({ onNewExperiment }: DashboardViewProps) {
               </thead>
               <tbody>
                 {RECENT_EXPERIMENTS.map((exp, i) => (
-                  <tr key={i} style={{ cursor: 'pointer' }}>
+                  <tr
+                    key={i}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => onNavigate('workspace')}
+                  >
                     <td className="mono-cell" style={{ fontWeight: 600 }}>{exp.id}</td>
                     <td style={{ fontWeight: 500, color: 'var(--ink)' }}>{exp.name}</td>
-                    <td><span className={`tag ${statusColor(exp.status)}`}>{exp.status}</span></td>
-                    <td className="mono-cell" style={{ color: exp.confidence > 0.8 ? 'var(--accent-sage)' : exp.confidence > 0.5 ? 'var(--accent-gold)' : 'var(--accent)' }}>
+                    <td><span className={`tag ${statusTagClass(exp.status)}`}>{exp.status}</span></td>
+                    <td className="mono-cell" style={{
+                      color: exp.confidence > 0.8 ? 'var(--accent-sage)'
+                        : exp.confidence > 0.5 ? 'var(--accent-gold)'
+                        : 'var(--accent)',
+                    }}>
                       {(exp.confidence * 100).toFixed(0)}%
                     </td>
                     <td className="mono-cell">{exp.iterations}</td>
@@ -192,9 +207,9 @@ export function DashboardView({ onNewExperiment }: DashboardViewProps) {
           <div className="scroll-area" style={{ flex: 1, padding: '12px 16px', overflowY: 'auto', maxHeight: 320 }}>
             {ACTIVITY.map((a, i) => {
               const dot = a.type === 'correction' ? 'var(--accent-warm)'
-                : a.type === 'complete' ? 'var(--accent-sage)'
-                : a.type === 'anomaly' ? 'var(--accent)'
-                : a.type === 'start' ? 'var(--accent-slate)'
+                : a.type === 'complete'   ? 'var(--accent-sage)'
+                : a.type === 'anomaly'    ? 'var(--accent)'
+                : a.type === 'start'      ? 'var(--accent-slate)'
                 : 'var(--accent-gold)';
               return (
                 <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'flex-start' }}>
