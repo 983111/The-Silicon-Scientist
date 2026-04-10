@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
 
-// ── Script Repository: centralized storage with preview, status, and reuse
-
 interface Script {
   id: string;
   name: string;
@@ -32,13 +30,13 @@ class PorositySampler:
         self.temperature = T
         self.step_size = 0.1
         self.acceptance_rate = 0.0
-        
+
     def energy(self, config):
         """Compute lattice energy for configuration"""
         E = -np.sum(config * np.roll(config, 1))
         E += 0.5 * np.sum(config**2)
         return E
-    
+
     def metropolis_step(self, config):
         """Single Metropolis-Hastings step"""
         trial = config + np.random.normal(0, self.step_size)
@@ -135,7 +133,6 @@ def green_kubo_viscosity(stress_trajectory, dt, T, V):
     eta = (V / (kB * T)) * np.trapz(acf, dx=dt)
     return eta
 
-# Load trajectory (simulated)
 np.random.seed(42)
 stress = np.random.normal(0, 1e6, 10000)
 dt, T, V = 1e-15, 298, 1e-27
@@ -193,26 +190,61 @@ function syntaxHighlight(code: string): React.ReactNode {
     }
     return (
       <div key={i} style={{ display: 'flex', gap: 0, minHeight: '1.5em' }}>
-        <span style={{ color: 'var(--ink-muted)', minWidth: '2.5rem', paddingRight: 12, textAlign: 'right', userSelect: 'none', opacity: 0.4, fontSize: 11 }}>{i + 1}</span>
+        <span style={{ color: 'var(--ink-muted)', minWidth: '2.5rem', paddingRight: 12, textAlign: 'right', userSelect: 'none', opacity: 0.4, fontSize: 11 }}>
+          {i + 1}
+        </span>
         <span style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 12 }}>{processed}</span>
       </div>
     );
   });
 }
 
-export function ScriptsView() {
+const statusTagClass = (s: string) => {
+  if (s === 'active') return 'green';
+  if (s === 'deprecated') return 'red';
+  return 'muted';
+};
+
+interface ScriptsViewProps {
+  showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
+}
+
+export function ScriptsView({ showToast }: ScriptsViewProps) {
   const [selectedId, setSelectedId] = useState<string>(SCRIPTS[0].id);
   const [searchQuery, setSearchQuery] = useState('');
 
   const selected = SCRIPTS.find(s => s.id === selectedId) || SCRIPTS[0];
   const filtered = searchQuery
-    ? SCRIPTS.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()) || s.description.toLowerCase().includes(searchQuery.toLowerCase()))
+    ? SCRIPTS.filter(s =>
+        s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        s.description.toLowerCase().includes(searchQuery.toLowerCase())
+      )
     : SCRIPTS;
 
-  const statusColor = (s: string) => {
-    if (s === 'active') return 'green';
-    if (s === 'idle') return 'muted';
-    return 'red';
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(selected.code);
+      showToast('Code copied to clipboard', 'success');
+    } catch {
+      showToast('Failed to copy', 'error');
+    }
+  };
+
+  const handleReuse = () => {
+    // Dispatch event to open the modal with the script pre-filled as context
+    window.dispatchEvent(new CustomEvent('silicon:open-modal'));
+    showToast(`Script "${selected.name}" loaded for reuse`, 'success');
+  };
+
+  const handleDownload = () => {
+    const blob = new Blob([selected.code], { type: 'text/x-python' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = selected.name;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(`Downloaded ${selected.name}`, 'success');
   };
 
   return (
@@ -223,13 +255,16 @@ export function ScriptsView() {
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700, margin: '0 0 10px' }}>Script Repository</h2>
           <input
             className="input-field"
-            placeholder="Search scripts..."
+            placeholder="Search scripts…"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             style={{ fontSize: 13 }}
           />
         </div>
         <div className="scroll-area" style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
+          {filtered.length === 0 && (
+            <p style={{ padding: '16px', fontSize: 13, color: 'var(--ink-muted)', textAlign: 'center' }}>No scripts found</p>
+          )}
           {filtered.map(script => (
             <button
               key={script.id}
@@ -249,9 +284,14 @@ export function ScriptsView() {
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5, fontWeight: 600, color: selectedId === script.id ? 'var(--accent)' : 'var(--ink)' }}>
                   {script.name}
                 </span>
-                <span className={`tag ${statusColor(script.status)}`} style={{ marginLeft: 'auto' }}>{script.status}</span>
+                <span className={`tag ${statusTagClass(script.status)}`} style={{ marginLeft: 'auto' }}>
+                  {script.status}
+                </span>
               </div>
-              <p style={{ fontSize: 11.5, color: 'var(--ink-muted)', margin: 0, lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+              <p style={{
+                fontSize: 11.5, color: 'var(--ink-muted)', margin: 0, lineHeight: 1.4,
+                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+              }}>
                 {script.description}
               </p>
               <div style={{ display: 'flex', gap: 12, marginTop: 6 }}>
@@ -273,15 +313,26 @@ export function ScriptsView() {
               <div style={{ fontSize: 12, color: 'var(--ink-muted)', marginTop: 2 }}>{selected.description}</div>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <span className={`tag ${statusColor(selected.status)}`}>{selected.status}</span>
+              <span className={`tag ${statusTagClass(selected.status)}`}>{selected.status}</span>
               <span className="tag blue">{selected.language}</span>
-              <button className="btn-ghost" style={{ fontSize: 12, padding: '5px 12px' }}>📋 Copy</button>
-              <button className="btn-primary sage" style={{ fontSize: 12, padding: '5px 12px' }}>▶ Reuse</button>
+              <button className="btn-ghost" style={{ fontSize: 12, padding: '5px 12px' }} onClick={handleCopy}>
+                📋 Copy
+              </button>
+              <button className="btn-ghost" style={{ fontSize: 12, padding: '5px 12px' }} onClick={handleDownload}>
+                ↓ Download
+              </button>
+              <button className="btn-primary sage" style={{ fontSize: 12, padding: '5px 12px' }} onClick={handleReuse}>
+                ▶ Reuse
+              </button>
             </div>
           </div>
           <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
-            <span style={{ fontSize: 11, color: 'var(--ink-muted)' }}>Experiment: <strong style={{ color: 'var(--ink-mid)' }}>{selected.experiment}</strong></span>
-            <span style={{ fontSize: 11, color: 'var(--ink-muted)' }}>Last run: <strong style={{ color: 'var(--ink-mid)' }}>{selected.lastRun}</strong></span>
+            <span style={{ fontSize: 11, color: 'var(--ink-muted)' }}>
+              Experiment: <strong style={{ color: 'var(--ink-mid)' }}>{selected.experiment}</strong>
+            </span>
+            <span style={{ fontSize: 11, color: 'var(--ink-muted)' }}>
+              Last run: <strong style={{ color: 'var(--ink-mid)' }}>{selected.lastRun}</strong>
+            </span>
             <span style={{ fontSize: 11, color: 'var(--ink-muted)' }}>{selected.lines} lines</span>
           </div>
         </div>
